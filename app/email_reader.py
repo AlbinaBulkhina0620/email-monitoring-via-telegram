@@ -1,9 +1,12 @@
 import imaplib
 import os
+import email
 
 from dotenv import load_dotenv
 from email.header import decode_header
+
 from app.filters import is_trusted_sender
+from app.telegram_client import send_telegram_alert
 
 load_dotenv()
 
@@ -26,9 +29,11 @@ def connect_to_mailbox():
 
     return mail
 
-import email
 
 def decode_mime_words(text):
+    if not text:
+        return ""
+
     decoded_parts = decode_header(text)
 
     decoded_string = ""
@@ -47,7 +52,9 @@ def decode_mime_words(text):
 
     return decoded_string
 
+
 def fetch_unread_emails(mail):
+
     status, messages = mail.search(None, "UNSEEN")
 
     email_ids = messages[0].split()
@@ -65,6 +72,13 @@ def fetch_unread_emails(mail):
         sender = decode_mime_words(msg["From"])
 
         subject = decode_mime_words(msg["Subject"])
+
+
+        if not is_trusted_sender(sender):
+
+            print("Skipped untrusted sender:", sender)
+
+            continue
 
         body = ""
 
@@ -87,6 +101,7 @@ def fetch_unread_emails(mail):
                         break
 
         else:
+
             payload = msg.get_payload(decode=True)
 
             if payload:
@@ -95,25 +110,39 @@ def fetch_unread_emails(mail):
                     errors="ignore"
                 )
 
-
-                if not is_trusted_sender(sender):
-                    print("Skipped untrudted sender: ", sender)
-                    continue
-
         print("---------------")
         print("FROM:", sender)
         print("SUBJECT:", subject)
         print("BODY:", body[:200])
 
+        message = f"""
+🔥 NEW EMAIL ALERT 🔥
+
+👤 Sender:
+{sender}
+
+📌 Subject:
+{subject}
+
+💬 Message:
+{body[:200]}
+
+━━━━━━━━━━━━━━
+🤖 Email Monitoring Bot
+"""
+
+        send_telegram_alert(message)
+
+
 def close_connection(mail):
+
     mail.logout()
 
 
 if __name__ == "__main__":
+
     mail = connect_to_mailbox()
 
-    print("Login successful!")
-
-    fetch_unread_emails(mail) 
+    fetch_unread_emails(mail)
 
     close_connection(mail)

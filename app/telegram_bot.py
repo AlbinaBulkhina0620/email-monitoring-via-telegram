@@ -27,11 +27,18 @@ async def send_alert(
     chat_id = DEFAULT_USER_ID
 
     try:
-        await bot.send_message(chat_id=chat_id, text=alert.message)
+        async with bot:
+            await bot.send_message(chat_id=chat_id, text=alert.message)
         return {"status": "sent", "chat_id": chat_id}
     except Exception as e:
+        print("TELEGRAM ERROR:", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    async with bot:
+        me = await bot.get_me()
+    return {
+        "status": "ok",
+        "bot": me
+    }
